@@ -5,20 +5,11 @@ import {
   type Grant,
   type Json,
   type ProviderContext,
-  type Schema,
 } from '../contracts.ts';
-import { checkSchema, validate } from '../validation.ts';
+import { checkSchema } from '../validation.ts';
 import { abortable } from '../abort.ts';
 
-export interface ProviderRegistration {
-  protocolVersion: 1;
-  id: string;
-  provider: CapabilityProvider;
-  /** Missing resource scopes are validated as {} and never imply full access. */
-  scopeSchema?: Schema;
-  /** Registry owns disposal once a registration is accepted. Must be idempotent. */
-  dispose?(signal: AbortSignal): Promise<void>;
-}
+import type { RuntimeModule, RuntimePolicy } from './types.ts';
 const identifier = /^[a-zA-Z][a-zA-Z0-9_.-]{0,119}$/;
 function providerError(error: unknown): BionicError {
   // Separate installed SDK copies have different Error constructors.
@@ -40,50 +31,51 @@ function providerError(error: unknown): BionicError {
   }
   return new BionicError('provider_error', 'Platform API failed');
 }
-export function validateRegistration(value: unknown): asserts value is ProviderRegistration {
-  const r = value as ProviderRegistration;
-  if (!r || r.protocolVersion !== 1 || typeof r.id !== 'string' || !identifier.test(r.id)) {
-    throw new BionicError('configuration', 'Invalid provider ID or protocol version');
+export function validateModule(value: unknown): asserts value is RuntimeModule {
+  const r = value as RuntimeModule;
+  if (!r || typeof r.id !== 'string' || !identifier.test(r.id)) {
+    throw new BionicError('configuration', 'Invalid module ID');
   }
   if (
-    !r.provider ||
-    ['definitions', 'authorize', 'invoke'].some(
-      (method) => typeof (r.provider as any)[method] !== 'function',
-    ) ||
+    !Array.isArray(r.capabilities) ||
+    typeof r.invoke !== 'function' ||
+    (r.authorize !== undefined && typeof r.authorize !== 'function') ||
     (r.dispose !== undefined && typeof r.dispose !== 'function')
   ) {
-    throw new BionicError('configuration', `Invalid provider interface: ${r.id}`);
+    throw new BionicError('configuration', `Invalid module interface: ${r.id}`);
   }
 }
 
-export class ProviderRegistry implements CapabilityProvider {
-  private routes = new Map<string, CapabilityProvider>();
+export class ModuleRegistry implements CapabilityProvider {
+  private routes = new Map<string, RuntimeModule>();
   private catalog: Capability[] = [];
-  private scopes = new Map<string, Schema>();
-  private registrations: ProviderRegistration[] = [];
+  private registrations: RuntimeModule[] = [];
   private controller = new AbortController();
   private closing?: Promise<void>;
   private state: 'collecting' | 'ready' | 'failed' | 'closed' = 'collecting';
   private ids = new Set<string>();
+  private owned = new Set<RuntimeModule>();
   private errors: string[] = [];
+
+  constructor(private policy: RuntimePolicy = {}) {}
 
   offer(value: unknown): { accepted: boolean; error?: string } {
     if (this.state !== 'collecting') {
-      return { accepted: false, error: 'Provider registry is not collecting' };
+      return { accepted: false, error: 'Module registry is not collecting' };
     }
     try {
-      validateRegistration(value);
+      validateModule(value);
+      // Even a duplicate module belongs to this failed runtime and must be cleaned up.
+      if (!this.owned.has(value)) {
+        this.owned.add(value);
+        this.registrations.push({ ...value, dispose: value.dispose?.bind(value) });
+      }
       if (this.ids.has(value.id)) {
-        throw new Error('Duplicate provider ID');
+        throw new Error('Duplicate module ID');
       }
       // Take ownership before metadata validation so failed startup also cleans up.
       this.ids.add(value.id);
-      this.registrations.push(value);
-      const scope = structuredClone(
-        value.scopeSchema ?? { type: 'object', additionalProperties: false },
-      );
-      checkSchema(scope);
-      const definitions = structuredClone(value.provider.definitions());
+      const definitions = structuredClone(value.capabilities);
       if (
         !Array.isArray(definitions) ||
         definitions.length > 100 ||
@@ -112,31 +104,26 @@ export class ProviderRegistry implements CapabilityProvider {
         checkSchema(d.inputSchema);
         checkSchema(d.outputSchema);
       }
-      this.scopes.set(value.id, scope);
       for (const definition of definitions) {
         this.routes.set(definition.name, {
-          definitions: () => [],
-          authorize: value.provider.authorize.bind(value.provider),
-          invoke: value.provider.invoke.bind(value.provider),
+          id: value.id,
+          capabilities: [],
+          authorize: value.authorize?.bind(value),
+          invoke: value.invoke.bind(value),
         });
       }
       this.catalog.push(...definitions);
       return { accepted: true };
     } catch {
       // Configuration exceptions can contain credentials supplied by host SDKs.
-      const message = 'Invalid, duplicate, reserved or incompatible provider registration';
+      const message = 'Invalid, duplicate, reserved or incompatible module registration';
       this.errors.push(message);
       return { accepted: false, error: message };
     }
   }
-  seal(required: string[] = []) {
+  seal() {
     if (this.state !== 'collecting') {
       throw new BionicError('configuration', 'Registry already sealed');
-    }
-    for (const id of required) {
-      if (!this.ids.has(id)) {
-        this.errors.push(`Required provider missing: ${id}`);
-      }
     }
     this.state = this.errors.length ? 'failed' : 'ready';
     this.assertReady();
@@ -145,7 +132,7 @@ export class ProviderRegistry implements CapabilityProvider {
     if (this.state !== 'ready') {
       throw new BionicError(
         'configuration',
-        this.errors.join('; ') || 'Provider registry unavailable',
+        this.errors.join('; ') || 'Module registry unavailable',
       );
     }
   }
@@ -153,41 +140,37 @@ export class ProviderRegistry implements CapabilityProvider {
     this.assertReady();
     return structuredClone(this.catalog);
   }
-  validateGrant(grant: Grant) {
+  authorize(name: string, args: Json, _grant: Grant, context?: ProviderContext) {
     this.assertReady();
-    for (const [id, schema] of this.scopes) {
-      validate(schema, grant.resources?.[id] ?? {});
-    }
-  }
-  authorize(name: string, args: Json, grant: Grant, context?: ProviderContext) {
-    this.assertReady();
-    this.validateGrant(grant);
     const route = this.routes.get(name);
     if (!route) {
-      throw new BionicError('forbidden', 'Unknown provider capability');
+      throw new BionicError('forbidden', 'Unknown module capability');
     }
-    // Trusted providers cannot accidentally change the broker's work grant/arguments.
-    try {
-      const result = route.authorize(name, structuredClone(args), structuredClone(grant), context);
-      if (result) {
-        return Promise.resolve(result).catch((error) => {
-          throw providerError(error);
-        });
+    if (!context) {
+      throw new BionicError('configuration', 'Missing host call context');
+    }
+    const call = { ...context };
+    return (async () => {
+      try {
+        await this.policy.authorize?.(name, structuredClone(args), call);
+        context.signal.throwIfAborted();
+        await route.authorize?.(name, structuredClone(args), call);
+      } catch (error) {
+        throw providerError(error);
       }
-    } catch (error) {
-      throw providerError(error);
-    }
+    })();
   }
   async invoke(name: string, args: Json, context: ProviderContext) {
     this.assertReady();
     const route = this.routes.get(name);
     if (!route) {
-      throw new BionicError('forbidden', 'Unknown provider capability');
+      throw new BionicError('forbidden', 'Unknown module capability');
     }
     const signal = AbortSignal.any([context.signal, this.controller.signal]);
+    const call = { ...context };
     try {
       return await abortable(
-        () => route.invoke(name, structuredClone(args), { ...context, signal }),
+        () => route.invoke(name, structuredClone(args), { ...call, signal }),
         signal,
       );
     } catch (error) {
@@ -208,7 +191,7 @@ export class ProviderRegistry implements CapabilityProvider {
         ),
       );
       if (outcomes.some((o) => o.status === 'rejected')) {
-        throw new BionicError('provider_error', 'Provider cleanup failed or exceeded 1000ms');
+        throw new BionicError('provider_error', 'Module cleanup failed or exceeded 1000ms');
       }
     })();
     return this.closing;

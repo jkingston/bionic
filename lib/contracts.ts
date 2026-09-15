@@ -100,7 +100,6 @@ export interface ProviderContext {
   workId: string;
   runId: string;
   callId: string;
-  resources: Record<string, Json>;
   maxOutputBytes: number;
 }
 export interface Grant {
@@ -110,8 +109,6 @@ export interface Grant {
   tools: ToolName[];
   capabilities: string[];
   services: string[];
-  /** Provider IDs map to provider-schema-validated resource scopes. */
-  resources?: Record<string, Json>;
   limits: {
     calls: number;
     writes: number;

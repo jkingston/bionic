@@ -10,9 +10,9 @@
   beyond the explicit JSON bridge, and no container/Bubblewrap dependency.
 - Shared ToolService for Pi and scripts: nested search/read/write/edit/verify/run,
   inherited declarations and grants, aggregate budgets, cancellation, and traces.
-- Separate Pi provider extensions with a public SDK, frozen registry, resource scopes,
+- Pi-independent runtime modules with optional Pi loaders, frozen catalogs, module restrictions,
   cancellation and disposal; fake SRE, clock, catalog, and HTTP JSON foundations.
-- API-sourced work context and trusted grant configuration.
+- API-sourced work context and optional runtime policy.
 - Optional fixture verification. Untested/failed-test drafts can execute within
   grants; review never confers runtime authority.
 - Tests using SQLite in memory and on disk, adversarial WASM guest code, nested
@@ -26,7 +26,7 @@ Git-backed publication and human review, HTTP event intake, durable workflows,
 platform-specific SDK adapters, live grant revocation/approval UI, alternative storage
 backends, retention/garbage collection, and real-model benchmark results.
 The design documents specify extension points; they are not claims those
-integrations exist. API grants currently refresh at each user prompt.
+integrations exist. Runtime policy is fixed at runtime creation; work budgets reset per user prompt.
 
 ## Next validation: real-model reuse
 
@@ -47,7 +47,7 @@ tasks. Report uncertainty; these are targets, not achieved results.
 
 ## Future integrations
 
-Deployment APIs now use [independent Pi extensions](provider-extensions.md), with
+Deployment APIs now use [Pi-independent runtime modules](runtime-modules.md), with
 clock, fake SRE, catalog and controlled HTTP JSON foundations. Validate a deployment
 against its real platform before relying on it operationally. Mutation APIs need
 idempotency and uncertain-outcome semantics before implementation.

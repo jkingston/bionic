@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -12,10 +12,10 @@ import {
   type ExtensionAPI,
 } from '@earendil-works/pi-coding-agent';
 import { TOOL_NAMES } from '../lib/contracts.ts';
-import { defaultGrant } from '../lib/policy.ts';
 import { basic } from './helpers.ts';
 import { OPERATING_PROMPT } from '../lib/prompt.ts';
-import { registerBionicProvider, createClockProvider } from '../lib/providers/index.ts';
+import { registerModule } from '../lib/pi/modules.ts';
+import { createClockModule } from '../lib/runtime/index.ts';
 
 const ai = await import(
   new URL(
@@ -30,15 +30,10 @@ test('production extensions: discovery, WASM composition, reload, fresh sessions
   mkdirSync(agentDir);
   const previous = {
     controlled: process.env.BIONIC_CONTROLLED,
-    deployment: process.env.BIONIC_DEPLOYMENT,
   };
   process.env.BIONIC_CONTROLLED = '1';
-  process.env.BIONIC_DEPLOYMENT = join(dir, 'deployment.json');
   t.after(() => {
-    for (const [key, value] of [
-      ['BIONIC_CONTROLLED', previous.controlled],
-      ['BIONIC_DEPLOYMENT', previous.deployment],
-    ]) {
+    for (const [key, value] of [['BIONIC_CONTROLLED', previous.controlled]]) {
       if (value === undefined) {
         delete process.env[key!];
       } else {
@@ -57,33 +52,22 @@ test('production extensions: discovery, WASM composition, reload, fresh sessions
   runtime.registerNativeProvider(faux.provider);
   let disposals = 0;
   let staleApi: ExtensionAPI | undefined;
+  class LifecycleModule {
+    id = 'lifecycle';
+    capabilities = [];
+    async invoke() {
+      return this.id;
+    }
+    async dispose() {
+      assert.equal(this.id, 'lifecycle');
+      disposals++;
+    }
+  }
   const lifecycle = (pi: ExtensionAPI) => {
     staleApi = pi;
-    registerBionicProvider(pi, {
-      protocolVersion: 1,
-      id: 'lifecycle',
-      provider: { definitions: () => [], authorize() {}, invoke: async () => null },
-      dispose: async () => {
-        disposals++;
-      },
-    });
+    registerModule(pi, new LifecycleModule());
   };
-  for (const scenario of ['core-first', 'provider-first', 'missing', 'duplicate'] as const) {
-    const grant = defaultGrant();
-    grant.capabilities.push('clock.now');
-    writeFileSync(
-      process.env.BIONIC_DEPLOYMENT!,
-      JSON.stringify({
-        extensions: [],
-        requiredProviders: [
-          'bionic.clock',
-          'bionic.fake-sre',
-          'lifecycle',
-          ...(scenario === 'missing' ? ['absent'] : []),
-        ],
-        grant,
-      }),
-    );
+  for (const scenario of ['core-first', 'provider-first', 'malformed', 'duplicate'] as const) {
     let paths = ['extensions/bionic.ts', 'extensions/clock.ts', 'extensions/fake-sre.ts'].map((p) =>
       resolve(p),
     );
@@ -92,7 +76,18 @@ test('production extensions: discovery, WASM composition, reload, fresh sessions
     }
     const factories = [lifecycle];
     if (scenario === 'duplicate') {
-      factories.push((pi) => registerBionicProvider(pi, createClockProvider()));
+      factories.push((pi) => registerModule(pi, createClockModule()));
+    }
+    if (scenario === 'malformed') {
+      factories.push((pi) =>
+        registerModule(pi, {
+          ...createClockModule(),
+          id: 'bad',
+          capabilities: [
+            { ...createClockModule().capabilities[0], inputSchema: { pattern: '.*' } },
+          ],
+        }),
+      );
     }
     const settings = SettingsManager.inMemory({
       retry: { enabled: false },
@@ -126,7 +121,7 @@ test('production extensions: discovery, WASM composition, reload, fresh sessions
     const before: number = disposals;
     try {
       await session.bindExtensions({ onError: (e) => errors.push(e) });
-      if (scenario === 'missing' || scenario === 'duplicate') {
+      if (scenario === 'malformed' || scenario === 'duplicate') {
         assert.ok(errors.length > 0);
         faux.setResponses([
           ai.fauxAssistantMessage(
@@ -241,12 +236,12 @@ test('provider without Bionic produces an explicit diagnostic', async () => {
   const { createEventBus } = await import('@earendil-works/pi-coding-agent');
   const handlers = new Map<string, any>();
   const messages: string[] = [];
-  registerBionicProvider(
+  registerModule(
     {
       events: createEventBus(),
       on: (name: string, handler: unknown) => handlers.set(name, handler),
     } as unknown as ExtensionAPI,
-    createClockProvider(),
+    createClockModule(),
   );
   handlers.get('session_start')(
     {},

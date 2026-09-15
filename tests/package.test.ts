@@ -43,15 +43,16 @@ test('packed SDK works in an external Pi deployment with a separate provider pac
   writeFileSync(
     join(platform, 'index.mjs'),
     `
-    import { registerBionicProvider, BionicError } from 'bionic-pi/providers';
-    export default function(pi) {
-      registerBionicProvider(pi, { protocolVersion: 1, id: 'external.platform', provider: {
-        definitions: () => [{ name: 'external.echo', version: 1, effect: 'read', description: 'External API',
-          inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }],
-        authorize(name, args) { if (args.deny) throw new BionicError('permission_required', 'External scope denied'); },
-        async invoke(name, args, ctx) { return { external: true, principal: ctx.principal }; }
-      }});
-    }
+    import { registerModule } from 'bionic-pi/pi';
+    import { BionicError } from 'bionic-pi/runtime';
+    export const module = {
+      id: 'external.platform',
+      capabilities: [{ name: 'external.echo', version: 1, effect: 'read', description: 'External API',
+        inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }],
+      authorize(name, args) { if (args.deny) throw new BionicError('permission_required', 'External scope denied'); },
+      async invoke(name, args, ctx) { return { external: true, principal: ctx.principal }; }
+    };
+    export default function(pi) { registerModule(pi, module); }
   `,
   );
   // A lockfile install need not cache registry metadata for a new dependency tree.
@@ -73,11 +74,11 @@ test('packed SDK works in an external Pi deployment with a separate provider pac
   writeFileSync(
     join(external, 'types.ts'),
     `
-    import { createClockProvider, type ProviderRegistration } from 'bionic-pi/providers';
-    const provider: ProviderRegistration = createClockProvider();
-    // @ts-expect-error Protocol versions are checked across the published type boundary.
-    const invalid: ProviderRegistration['protocolVersion'] = 2;
-    void provider; void invalid;
+    import { createClockModule, type RuntimeModule } from 'bionic-pi/runtime';
+    const module: RuntimeModule = createClockModule();
+    // @ts-expect-error Modules must implement invocation.
+    const invalid: RuntimeModule = { id: 'broken', capabilities: [] };
+    void module; void invalid;
   `,
   );
   run(
@@ -106,6 +107,6 @@ test('packed SDK works in an external Pi deployment with a separate provider pac
   assert.match(run(process.execPath, ['smoke.mjs'], external), /External deployment passed/);
   assert.match(
     run(process.execPath, ['node_modules/bionic-pi/bin/bionic.mjs', '--help'], external),
-    /--deployment/,
+    /--extension/,
   );
 });

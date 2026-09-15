@@ -1,6 +1,6 @@
 // Copied into a temporary deployment by package.test.ts. Only public package imports.
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -19,42 +19,30 @@ const cwd = process.cwd(),
 mkdirSync(agentDir);
 const core = fileURLToPath(import.meta.resolve('bionic-pi'));
 const platform = resolve('node_modules/test-platform/index.mjs');
-const deployment = {
-  extensions: [platform],
-  requiredProviders: ['external.platform'],
-  grant: {
-    principal: 'external-user',
-    readPrefixes: [''],
-    writePrefixes: [''],
-    tools: [
-      'read',
-      'write',
-      'edit',
-      'ls',
-      'find',
-      'grep',
-      'search',
-      'verify',
-      'execute',
-      'capabilities',
-    ],
-    capabilities: ['external.echo', 'work.current', 'policy.describe'],
-    services: [],
-    limits: {
-      calls: 100,
-      writes: 10,
-      sourceBytes: 100000,
-      outputBytes: 1000000,
-      workMs: 30000,
-      runMs: 1000,
-      depth: 4,
-      workers: 4,
-    },
-  },
-};
-writeFileSync('deployment.json', JSON.stringify(deployment));
-process.env.BIONIC_DEPLOYMENT = resolve('deployment.json');
 process.env.BIONIC_CONTROLLED = '1';
+const { createRuntime } = await import('bionic-pi/runtime');
+const { module: externalModule } = await import('./node_modules/test-platform/index.mjs');
+const headless = await createRuntime({ root: resolve('headless-data'), modules: [externalModule] });
+try {
+  const work = headless.beginWork({ task: 'No Pi required' });
+  const artifact = await work.invoke('write', {
+    path: 'headless.js',
+    expectedVersion: null,
+    source: 'export async function main(host){return host.invoke("external.echo",{})}',
+    contract: {
+      description: 'Headless',
+      inputSchema: {},
+      outputSchema: {},
+      tools: [],
+      fixtures: [],
+      capabilities: [{ name: 'external.echo', version: 1 }],
+    },
+  });
+  const result = await work.invoke('execute', { ref: artifact.ref, input: {} });
+  assert.deepEqual(result.output, { external: true, principal: 'local' });
+} finally {
+  await headless.dispose();
+}
 const runtime = await ModelRuntime.create({
   authPath: resolve(agentDir, 'auth.json'),
   modelsPath: null,
@@ -123,7 +111,7 @@ try {
       return tool('execute', { ref, input: {} });
     },
     (context) => {
-      assert.deepEqual(last(context).output, { external: true, principal: 'external-user' });
+      assert.deepEqual(last(context).output, { external: true, principal: 'local' });
       return tool('execute', { ref, input: { deny: true } });
     },
     (context) => {

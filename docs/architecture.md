@@ -10,9 +10,9 @@ There is no second agent loop or Python service in the target design.
 
 The invariant becomes **capability survives a fresh session**. Normal Pi sessions
 retain history. Bionic must discover and run programs without that history.
-The default demo uses separate fake SRE, clock and catalog provider extensions.
-Deployments can load their own API extensions through the public provider SDK;
-see [provider authoring](provider-extensions.md).
+The optional demo modules provide fake SRE, clock and catalog APIs.
+Deployments configure runtime modules and load them directly or through Pi loaders;
+see [runtime module authoring](runtime-modules.md).
 
 ## Pi integration
 
@@ -29,7 +29,7 @@ and [package format](https://github.com/badlogic/pi-mono/blob/main/packages/codi
 
 Disable all Pi built-in tools and expose only the controlled script tools below.
 Keep ordinary conversation history; operational context must be retrieved through
-authorized APIs, not injected summaries or memory. The launcher loads only the trusted Bionic extension and checks
+authorized APIs, not injected summaries or memory. The launcher loads Bionic and explicitly selected trusted Pi loaders and checks
 the exact active tool allowlist on startup and reload; an unexpected tool causes
 startup to fail. Other extensions must not introduce alternative access paths.
 Do not register each saved script as its own tool.
@@ -65,7 +65,9 @@ lib/worker.mjs           QuickJS WASM guest and JSON bridge
 lib/adapters/sqlite.ts   Transactional script and evidence repositories
 lib/adapters/wasm.ts     Worker scheduling, deadlines, cancellation
 lib/adapters/fake-sre.ts Deterministic read-only capabilities
-lib/application.ts      Dependency wiring and work-context bootstrap
+lib/application.ts      Storage wiring and work-context bootstrap
+lib/runtime/            Pi-independent runtime, modules and policy
+lib/pi/modules.ts       Module discovery through Pi loaders
 lib/prompt.ts           Static agent operating instructions
 tests/                  Registry, WASM, composition, actual Pi integration
 ```
@@ -198,12 +200,11 @@ Authorized registry writes use the broker, not direct storage access. Every
 child executes an immutable reference even if a script edits its own path.
 Quality status does not confer access or gate ordinary execution.
 
-The first provider exposes only fake read-only SRE APIs and work/policy context.
-CapabilityProvider requires target authorization as well as invocation; a future
-real adapter must implement its own resource checks. Grants are loaded from
-trusted configuration at the start of each user prompt. Live revocation and
-interactive grant issuance remain future integrations; cancellation stops the
-current work. The trusted Pi host itself is not a WASM guest.
+Runtime modules expose platform APIs with module-local resource restrictions.
+The runtime resolves available capabilities and optional policy at creation;
+each user prompt starts a fresh cumulative work budget. Live policy revocation
+remains a future integration; cancellation stops current work. The trusted Pi
+host and runtime modules are not WASM guests.
 
 ## Sessions and recovery
 

@@ -11,7 +11,7 @@ npm install 'git+https://github.com/jkingston/bionic.git#main'
 ```
 
 Requires Node 24+ and enabled install scripts. Pin a commit or tag for deployments;
-see [Git installation and local development](docs/provider-extensions.md#install-from-git-or-develop-locally).
+see [Git installation and local development](docs/runtime-modules.md#install-from-git-or-develop-locally).
 
 ## Run
 
@@ -25,8 +25,7 @@ mise run pi --model 'provider/model-id'
 ```
 
 Both `mise run pi` and `npm start` use the controlled Bionic launcher and retain
-your saved Pi credentials/models (`PI_CODING_AGENT_DIR` is honored). The default
-profile loads the fake SRE, clock, and deployment-catalog extensions. `/bionic`
+your saved Pi credentials/models (`PI_CODING_AGENT_DIR` is honored). The core loads by default; add runtime modules through explicit `-e` Pi loaders. `/bionic`
 shows status; `/bionic runs` shows recent evidence. Shell `!`/`!!` commands are
 disabled. Each user prompt begins a shared work budget.
 
@@ -37,15 +36,15 @@ credentials from the environment, use `npm start -- --isolated --model YOUR_MODE
 To load deployment-specific APIs:
 
 ```bash
-mise run pi --deployment examples/deployment/deployment.json --model 'provider/model-id'
+mise run pi -e ./examples/local-extension/hello.mjs --model 'provider/model-id'
 ```
 
-See [provider extension authoring](docs/provider-extensions.md) for external
-packages, grants, lifecycle rules, and the HTTP JSON example. Built-in tools,
+See [runtime module authoring](docs/runtime-modules.md) for external
+packages, module configuration, standalone execution, and the HTTP JSON example. Built-in tools,
 ambient extension discovery, context files, skills, and templates stay disabled.
 
 For a complete local example, follow
-[build a local extension and run it with Bionic](docs/provider-extensions.md#build-a-local-extension-and-run-it-with-bionic).
+[a local module and its Pi loader](docs/runtime-modules.md#a-local-module-and-its-pi-loader).
 
 This controls the agent's tools. The trusted Pi process itself is not sandboxed;
 only generated scripts run inside the WASM guest. Do not load arbitrary extensions
@@ -137,20 +136,11 @@ security boundary; the WASM guest and explicit imports provide containment.
 This remains dependent on the correctness of QuickJS, its WASM binding, and the
 bridge implementation, rather than a claim of formal security verification.
 
-The default demo grant permits all ten script tools over the local registry, fake
-SRE services (`checkout`, `payments`, `auth`), the clock and demo catalog, and core
-work/policy APIs. Custom deployments supply their own API and resource grants.
-The HTTP JSON foundation is tested locally; no production platform is configured.
-The broker checks declarations, grants, API schemas, and actual target services.
-Nested calls share cumulative calls, writes, source/output, time, and worker limits.
-Untested or failed-test scripts may run within those limits. Code review grants
-no authority, and there is no automatic permission escalation.
-
-A human can supply `.bionic/grant.json` matching the `Grant` type in
-[contracts.ts](lib/contracts.ts). It is loaded at the start of each user prompt;
-changes apply to the next work item. For immediate interruption, cancel the
-current Pi turn. The model cannot edit this file through script tools. Interactive
-grant approval and live revocation services are not implemented.
+Explicitly loaded modules define available platform APIs and resource restrictions.
+The runtime supplies default execution budgets; embeddings may add a narrower
+`RuntimePolicy`. Scripts cannot load modules, access credentials or change host
+configuration. Nested calls share cumulative budgets and declarations can only
+narrow access. Script quality and review confer no authority.
 
 ## Storage and interfaces
 
@@ -173,4 +163,4 @@ event intake, durable workflows, and real-model evaluation remain future work.
 - [Script composition](docs/composition.md)
 - [Agent prompt](docs/agent-prompt.md)
 - [Implementation status and next steps](docs/future.md)
-- [Deployment APIs and provider extensions](docs/provider-extensions.md)
+- [Runtime modules and Pi loaders](docs/runtime-modules.md)

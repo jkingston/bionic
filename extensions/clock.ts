@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { registerBionicProvider, createClockProvider } from '../lib/providers/index.ts';
-export default function clock(pi: ExtensionAPI) {
-  registerBionicProvider(pi, createClockProvider());
+import { createClockModule } from '../lib/runtime/index.ts';
+import { registerModule } from '../lib/pi/modules.ts';
+export default function extension(pi: ExtensionAPI) {
+  registerModule(pi, createClockModule());
 }

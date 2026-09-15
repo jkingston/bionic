@@ -1,9 +1,10 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { registerBionicProvider, createCatalogProvider } from '../lib/providers/index.ts';
+import { createCatalogModule } from '../lib/runtime/index.ts';
+import { registerModule } from '../lib/pi/modules.ts';
 export default function catalog(pi: ExtensionAPI) {
-  registerBionicProvider(
+  registerModule(
     pi,
-    createCatalogProvider(
+    createCatalogModule(
       ['checkout', 'payments', 'auth'].map((id) => ({
         id,
         description: `Demo ${id} service`,

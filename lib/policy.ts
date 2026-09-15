@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BionicError, TOOL_NAMES, type Grant, type Invocation, type Json } from './contracts.ts';
-import { prefix, validate } from './validation.ts';
+import { prefix } from './validation.ts';
 export function coreGrant(): Grant {
   return { ...defaultGrant(), capabilities: ['work.current', 'policy.describe'], services: [] };
 }
@@ -49,17 +49,6 @@ export function validateGrant(grant: Grant): Grant {
   }
   grant.readPrefixes.forEach(prefix);
   grant.writePrefixes.forEach(prefix);
-  if (grant.resources !== undefined) {
-    if (
-      !grant.resources ||
-      typeof grant.resources !== 'object' ||
-      Array.isArray(grant.resources) ||
-      Buffer.byteLength(JSON.stringify(grant.resources)) > 65536
-    ) {
-      throw new BionicError('invalid_input', 'Invalid provider resource scopes');
-    }
-    validate({ type: 'object' }, grant.resources);
-  }
   if (grant.tools.some((t) => !TOOL_NAMES.includes(t))) {
     throw new BionicError('invalid_input', 'Unknown granted tool');
   }

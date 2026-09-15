@@ -1,19 +1,20 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { randomUUID } from 'node:crypto';
 import { BionicError } from '../contracts.ts';
-import { ProviderRegistry, validateRegistration, type ProviderRegistration } from './registry.ts';
+import type { RuntimeModule } from '../runtime/types.ts';
+import { validateModule } from '../runtime/registry.ts';
 import { abortable } from '../abort.ts';
 
-const DISCOVER = 'bionic:providers:discover:v1';
-const PROBE = 'bionic:providers:probe:v1';
+const DISCOVER = 'bionic:modules:discover:v1';
+const PROBE = 'bionic:modules:probe:v1';
 interface Request {
   epoch: string;
   offer(value: unknown): { accepted: boolean; error?: string };
 }
 
 /** Call synchronously from a Pi extension factory, after any awaited configuration. */
-export function registerBionicProvider(pi: ExtensionAPI, registration: ProviderRegistration) {
-  validateRegistration(registration);
+export function registerModule(pi: ExtensionAPI, registration: RuntimeModule) {
+  validateModule(registration);
   let canRegister = true;
   pi.events.emit(PROBE, {
     acknowledge: (state: { canRegister: boolean }) => {
@@ -23,7 +24,7 @@ export function registerBionicProvider(pi: ExtensionAPI, registration: ProviderR
   if (!canRegister) {
     throw new BionicError(
       'configuration',
-      'Register providers during extension initialization; reload to change providers',
+      'Register modules during extension initialization; reload to change modules',
     );
   }
   let accepted = false;
@@ -41,7 +42,13 @@ export function registerBionicProvider(pi: ExtensionAPI, registration: ProviderR
       error = 'Malformed Bionic discovery request';
       return;
     }
-    const result = request.offer({ ...registration, dispose });
+    const result = request.offer({
+      id: registration.id,
+      capabilities: registration.capabilities,
+      authorize: registration.authorize?.bind(registration),
+      invoke: registration.invoke.bind(registration),
+      dispose,
+    });
     accepted = result.accepted;
     error = result.error;
   });
@@ -49,7 +56,7 @@ export function registerBionicProvider(pi: ExtensionAPI, registration: ProviderR
     let present = false;
     pi.events.emit(PROBE, { acknowledge: () => (present = true) });
     if (!present || error) {
-      ctx.ui.notify(error ?? `Bionic is missing for provider ${registration.id}`, 'error');
+      ctx.ui.notify(error ?? `Bionic is missing for module ${registration.id}`, 'error');
     }
   });
   pi.on('session_shutdown', async () => {
@@ -62,7 +69,7 @@ export function registerBionicProvider(pi: ExtensionAPI, registration: ProviderR
 }
 
 /** Installed in the core factory; discovery happens only after all factories finish. */
-export function providerDiscovery(pi: ExtensionAPI) {
+export function moduleDiscovery(pi: ExtensionAPI) {
   let canRegister = true;
   let consumers = 0;
   pi.events.emit(PROBE, { acknowledge: () => consumers++ });
@@ -75,17 +82,18 @@ export function providerDiscovery(pi: ExtensionAPI) {
       acknowledge({ canRegister });
     }
   });
-  return (registry: ProviderRegistry, required: string[]) => {
+  return () => {
+    const modules: RuntimeModule[] = [];
     canRegister = false;
     let open = true;
     pi.events.emit(DISCOVER, {
       epoch: randomUUID(),
       offer: (value: unknown) =>
         open
-          ? registry.offer(value)
-          : { accepted: false, error: 'Late registration: reload to change providers' },
+          ? (modules.push(value as RuntimeModule), { accepted: true })
+          : { accepted: false, error: 'Late registration: reload to change modules' },
     } satisfies Request);
     open = false;
-    registry.seal(required);
+    return modules;
   };
 }

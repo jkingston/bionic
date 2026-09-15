@@ -87,8 +87,6 @@ export class BionicService implements ToolService {
           scope: {
             readPrefixes: ctx.grant.readPrefixes,
             writePrefixes: ctx.grant.writePrefixes,
-            services: ctx.grant.services,
-            resources: ctx.grant.resources ?? {},
           },
           limits: ctx.grant.limits,
           remaining: {
@@ -354,7 +352,6 @@ export class BionicService implements ToolService {
       workId: ctx.workId,
       runId: ctx.parentRunId!,
       callId,
-      resources: structuredClone(ctx.grant.resources ?? {}),
       maxOutputBytes: Math.max(0, ctx.grant.limits.outputBytes - ctx.budget.outputBytes),
     };
     if (name !== 'work.current' && name !== 'policy.describe') {
@@ -363,7 +360,6 @@ export class BionicService implements ToolService {
           Promise.resolve(
             this.provider.authorize(name, structuredClone(args), structuredClone(ctx.grant), {
               ...apiContext,
-              resources: structuredClone(apiContext.resources),
             }),
           ),
         apiSignal,
@@ -382,8 +378,6 @@ export class BionicService implements ToolService {
     } else if (name === 'policy.describe') {
       output = json({
         principal: ctx.grant.principal,
-        services: ctx.grant.services,
-        resources: ctx.grant.resources ?? {},
         readPrefixes: ctx.grant.readPrefixes,
         writePrefixes: ctx.grant.writePrefixes,
         limits: ctx.grant.limits,
