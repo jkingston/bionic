@@ -54,12 +54,12 @@ test('packed SDK works in an external Pi deployment with a separate provider pac
     }
   `,
   );
-  // npm ci populates the cache; no registry access or install scripts during this test.
+  // A lockfile install need not cache registry metadata for a new dependency tree.
+  // Allow normal npm resolution on fresh runners; install scripts stay disabled.
   run(
     'npm',
     [
       'install',
-      '--offline',
       '--ignore-scripts',
       '--install-links',
       '--no-audit',

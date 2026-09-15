@@ -288,8 +288,9 @@ real Pi discovery/reload/fresh-session tests, startup failure, asynchronous deni
 cancellation, bounded cleanup and HTTP fixtures. The package test installs a
 built tarball and a separate provider into a temporary deployment, duplicates the
 SDK physically, then drives `capabilities → write → execute` through Pi and WASM.
-It uses the npm cache populated by `npm ci`; no live model or production platform
-is required. Tests need loopback networking for the HTTP fixture.
+The package test may access the npm registry to resolve dependencies on a fresh
+runner; no live model or production platform is required. Tests also need loopback
+networking for the HTTP fixture.
 
 The initial research compared eager registration, shared SDK singletons,
 discovery, explicit injection, ordinary Pi tool adapters and remote RPC. Discovery
