@@ -6,6 +6,23 @@ The Python/PydanticAI proof of concept has been removed.
 
 ## Run
 
+With mise, use your existing Pi login and model configuration:
+
+```bash
+mise install
+mise run setup
+mise run models
+mise run pi --model 'provider/model-id'
+```
+
+The `pi` task loads only Bionic and disables built-in tools, context files, skills,
+and prompt templates. It retains your normal Pi configuration directory (or your
+`PI_CODING_AGENT_DIR` override). Additional Pi arguments are passed through;
+use this task with trusted arguments. `mise run demo` runs without credentials,
+`mise run validate` runs all development checks, and `mise run format` formats files.
+
+Alternatively, run with npm and credentials from the environment:
+
 Requires **Node 24+**, npm, and a model provider API key. Pi 0.85.1 is pinned in
 the package; no separate global Pi install is required.
 

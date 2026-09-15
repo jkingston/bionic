@@ -1,2 +1,39 @@
 [tools]
 node = "24.21.0"
+
+[tasks.setup]
+description = "Install pinned dependencies"
+run = "npm ci"
+
+[tasks.pi]
+description = "Run Bionic using your configured Pi providers and models"
+raw = true
+raw_args = true
+env = { BIONIC_CONTROLLED = "1", PI_OFFLINE = "1", PI_TELEMETRY = "0" }
+run = """
+npx --no-install pi \
+  --no-builtin-tools \
+  --no-extensions -e ./extensions/bionic.ts \
+  --no-context-files \
+  --no-skills \
+  --no-prompt-templates \
+  --no-themes \
+  --no-approve \
+  --session-dir .bionic/sessions
+"""
+
+[tasks.models]
+description = "List models from your Pi configuration"
+run = "npx --no-install pi --list-models"
+
+[tasks.demo]
+description = "Run the demo without model credentials"
+run = "npm run demo"
+
+[tasks.validate]
+description = "Check formatting, lint, types, and tests"
+run = "npm run validate"
+
+[tasks.format]
+description = "Format source, configuration, and documentation"
+run = "npm run format"
