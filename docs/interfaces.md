@@ -88,8 +88,14 @@ interface ExecutionBackend {
 }
 
 interface CapabilityProvider {
-  definitions(scope: CapabilityScope): Promise<CapabilityDefinition[]>;
-  invoke(request: AuthorizedCapabilityCall): Promise<JsonValue>;
+  definitions(): Capability[];
+  authorize(
+    name: string,
+    args: Json,
+    grant: Grant,
+    context?: ProviderContext,
+  ): void | Promise<void>;
+  invoke(name: string, args: Json, context: ProviderContext): Promise<Json>;
 }
 
 interface WorkRepository {

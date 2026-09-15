@@ -1,6 +1,8 @@
 node_modules/
 .bionic/
 coverage/
+dist/
+*.tgz
 *.log
 .env
 .env.*

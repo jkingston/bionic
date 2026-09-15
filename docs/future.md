@@ -10,7 +10,9 @@
   beyond the explicit JSON bridge, and no container/Bubblewrap dependency.
 - Shared ToolService for Pi and scripts: nested search/read/write/edit/verify/run,
   inherited declarations and grants, aggregate budgets, cancellation, and traces.
-- Fake SRE APIs, API-sourced work context, and trusted grant configuration.
+- Separate Pi provider extensions with a public SDK, frozen registry, resource scopes,
+  cancellation and disposal; fake SRE, clock, catalog, and HTTP JSON foundations.
+- API-sourced work context and trusted grant configuration.
 - Optional fixture verification. Untested/failed-test drafts can execute within
   grants; review never confers runtime authority.
 - Tests using SQLite in memory and on disk, adversarial WASM guest code, nested
@@ -21,7 +23,7 @@ The Python/PydanticAI prototype, dependencies, environment, and guide were remov
 ## Deliberately not implemented
 
 Git-backed publication and human review, HTTP event intake, durable workflows,
-real-service adapters, live grant revocation/approval UI, alternative storage
+platform-specific SDK adapters, live grant revocation/approval UI, alternative storage
 backends, retention/garbage collection, and real-model benchmark results.
 The design documents specify extension points; they are not claims those
 integrations exist. API grants currently refresh at each user prompt.
@@ -45,7 +47,10 @@ tasks. Report uncertainty; these are targets, not achieved results.
 
 ## Future integrations
 
-Implement one real read-only capability with explicit target authorization first.
+Deployment APIs now use [independent Pi extensions](provider-extensions.md), with
+clock, fake SRE, catalog and controlled HTTP JSON foundations. Validate a deployment
+against its real platform before relying on it operationally. Mutation APIs need
+idempotency and uncertain-outcome semantics before implementation.
 Add Git storage and ReviewGateway when reviewed publication is needed; decisions
 must bind to exact hashes and remain separate from permissions. Add HTTP intake
 and WorkRepository when external events are needed, including durable receipts,

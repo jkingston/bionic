@@ -27,6 +27,7 @@ import {
   validate,
 } from './validation.ts';
 import { charge, check } from './policy.ts';
+import { abortable } from './abort.ts';
 
 export class BionicService implements ToolService {
   constructor(
@@ -87,6 +88,7 @@ export class BionicService implements ToolService {
             readPrefixes: ctx.grant.readPrefixes,
             writePrefixes: ctx.grant.writePrefixes,
             services: ctx.grant.services,
+            resources: ctx.grant.resources ?? {},
           },
           limits: ctx.grant.limits,
           remaining: {
@@ -327,6 +329,7 @@ export class BionicService implements ToolService {
     name: string,
     args: Json,
     ctx: Invocation,
+    callId: string,
     signal?: AbortSignal,
   ): Promise<Json> {
     check(ctx, signal);
@@ -339,8 +342,32 @@ export class BionicService implements ToolService {
       throw new BionicError('forbidden', `Unknown API: ${name}`);
     }
     validate(definition.inputSchema, args);
+    const deadline = Math.min(ctx.budget.deadline, Date.now() + ctx.grant.limits.runMs);
+    const deadlineSignal = AbortSignal.timeout(
+      Math.max(1, Math.min(2147483647, deadline - Date.now())),
+    );
+    const apiSignal = AbortSignal.any([deadlineSignal, ...(signal ? [signal] : [])]);
+    const apiContext = {
+      signal: apiSignal,
+      deadline,
+      principal: ctx.grant.principal,
+      workId: ctx.workId,
+      runId: ctx.parentRunId!,
+      callId,
+      resources: structuredClone(ctx.grant.resources ?? {}),
+      maxOutputBytes: Math.max(0, ctx.grant.limits.outputBytes - ctx.budget.outputBytes),
+    };
     if (name !== 'work.current' && name !== 'policy.describe') {
-      this.provider.authorize(name, args, ctx.grant);
+      await abortable(
+        () =>
+          Promise.resolve(
+            this.provider.authorize(name, structuredClone(args), structuredClone(ctx.grant), {
+              ...apiContext,
+              resources: structuredClone(apiContext.resources),
+            }),
+          ),
+        apiSignal,
+      );
     }
     let output: Json;
     if (ctx.fixture) {
@@ -356,13 +383,15 @@ export class BionicService implements ToolService {
       output = json({
         principal: ctx.grant.principal,
         services: ctx.grant.services,
+        resources: ctx.grant.resources ?? {},
         readPrefixes: ctx.grant.readPrefixes,
         writePrefixes: ctx.grant.writePrefixes,
         limits: ctx.grant.limits,
       });
     } else {
-      output = await this.provider.invoke(name, args);
+      output = await abortable(() => this.provider.invoke(name, args, apiContext), apiSignal);
     }
+    check(ctx, signal);
     validate(definition.outputSchema, output);
     charge(ctx, 'outputBytes', Buffer.byteLength(JSON.stringify(output)));
     return output;
@@ -405,6 +434,9 @@ export class BionicService implements ToolService {
     const local = new AbortController();
     const abort = () => local.abort();
     signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) {
+      abort();
+    }
     const child: Invocation = {
       ...ctx,
       depth: ctx.depth + 1,
@@ -435,7 +467,7 @@ export class BionicService implements ToolService {
               const value =
                 kind === 'tool'
                   ? await this.invoke(name, args, child, `${runId}:${callId}`, local.signal)
-                  : await this.api(name, args, child, local.signal);
+                  : await this.api(name, args, child, `${runId}:${callId}`, local.signal);
               await this.evidence.append({
                 id: `${runId}:${callId}`,
                 kind: 'tool',

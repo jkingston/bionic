@@ -5,18 +5,30 @@ import { TOOL_NAMES, failure, type Invocation, type ToolName } from '../lib/cont
 import { newWork } from '../lib/policy.ts';
 import { schemas, descriptions } from '../lib/schemas.ts';
 import { OPERATING_PROMPT } from '../lib/prompt.ts';
+import { ProviderRegistry } from '../lib/providers/registry.ts';
+import { providerDiscovery } from '../lib/providers/pi.ts';
+import { deploymentPolicy } from '../lib/deployment.ts';
 
 export default function bionic(pi: ExtensionAPI) {
+  const discoverProviders = providerDiscovery(pi);
+  let registry: ProviderRegistry | undefined;
+  let ready = false;
   let app: ReturnType<typeof openApplication> | undefined;
   let work: Invocation | undefined;
   let sessionAbort = new AbortController();
   const inflight = new Set<Promise<unknown>>();
   async function dispose() {
+    ready = false;
     sessionAbort.abort();
     await Promise.allSettled([...inflight]);
-    app?.store.close();
-    app = undefined;
-    work = undefined;
+    try {
+      await registry?.dispose();
+    } finally {
+      app?.store.close();
+      app = undefined;
+      work = undefined;
+      registry = undefined;
+    }
   }
   const checkTools = () => {
     const active = pi.getActiveTools().sort();
@@ -35,26 +47,37 @@ export default function bionic(pi: ExtensionAPI) {
     await dispose();
     sessionAbort = new AbortController();
     const root = resolve(ctx.cwd, '.bionic');
-    app = openApplication(root);
-    await app.seed();
-    pi.setActiveTools([...TOOL_NAMES]);
-    checkTools();
+    registry = new ProviderRegistry();
+    try {
+      discoverProviders(registry, deploymentPolicy().requiredProviders);
+      app = openApplication(root, registry, () => deploymentPolicy().grant);
+      registry.validateGrant(app.readGrant());
+      await app.seed();
+      pi.setActiveTools([...TOOL_NAMES]);
+      checkTools();
+      ready = true;
+    } catch (error) {
+      await dispose();
+      throw error;
+    }
     ctx.ui.setStatus('bionic', 'Bionic · WASM · script tools');
   });
   pi.on('before_agent_start', async (event) => {
     work = undefined;
     checkTools();
-    if (!app) {
+    if (!ready || !app || !registry) {
       throw new Error('Bionic failed to initialize');
     }
-    work = newWork(app.readGrant(), { task: event.prompt });
+    const grant = app.readGrant();
+    registry.validateGrant(grant);
+    work = newWork(grant, { task: event.prompt });
     // Static operating instructions only: no facts, memory, or registry inventory.
     return { systemPrompt: OPERATING_PROMPT };
   });
   pi.on('tool_call', () => {
     try {
       checkTools();
-      if (!app || !work) {
+      if (!ready || !app || !work) {
         throw new Error('Bionic is not ready');
       }
     } catch (e) {
@@ -89,7 +112,7 @@ export default function bionic(pi: ExtensionAPI) {
       async execute(toolCallId, args, signal, _onUpdate, _ctx) {
         try {
           checkTools();
-          if (!app || !work) {
+          if (!ready || !app || !work) {
             throw new Error('Bionic is not initialized');
           }
           const operation = app.service.invoke(

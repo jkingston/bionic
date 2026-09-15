@@ -10,7 +10,9 @@ There is no second agent loop or Python service in the target design.
 
 The invariant becomes **capability survives a fresh session**. Normal Pi sessions
 retain history. Bionic must discover and run programs without that history.
-The implemented vertical slice uses a deterministic fake SRE environment.
+The default demo uses separate fake SRE, clock and catalog provider extensions.
+Deployments can load their own API extensions through the public provider SDK;
+see [provider authoring](provider-extensions.md).
 
 ## Pi integration
 
@@ -20,7 +22,7 @@ Initialize project state on `session_start`; clean up workers on
 do not inject operational context or rewrite prompts per task. Return concise
 text in tool `content` and structured records in `details`.
 
-Package discovery uses `"pi": { "extensions": ["./extensions/bionic.ts"] }`
+Package discovery uses `"pi": { "extensions": ["./dist/extensions/bionic.js"] }`
 in package.json. Pinned Pi 0.85.1 uses `@earendil-works/pi-coding-agent` and
 `typebox`; the installed package versions are locked in package-lock.json. See the official [extension API](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md)
 and [package format](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md).

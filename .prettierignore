@@ -1,4 +1,5 @@
 node_modules/
 .bionic/
 coverage/
+dist/
 package-lock.json

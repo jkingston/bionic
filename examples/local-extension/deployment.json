@@ -1,0 +1,33 @@
+{
+  "extensions": ["./hello.mjs"],
+  "requiredProviders": ["example.local"],
+  "grant": {
+    "principal": "local-developer",
+    "readPrefixes": [""],
+    "writePrefixes": [""],
+    "tools": [
+      "read",
+      "write",
+      "edit",
+      "ls",
+      "find",
+      "grep",
+      "search",
+      "verify",
+      "execute",
+      "capabilities"
+    ],
+    "capabilities": ["local.hello", "work.current", "policy.describe"],
+    "services": [],
+    "limits": {
+      "calls": 200,
+      "writes": 30,
+      "sourceBytes": 1048576,
+      "outputBytes": 2097152,
+      "workMs": 120000,
+      "runMs": 10000,
+      "depth": 8,
+      "workers": 12
+    }
+  }
+}

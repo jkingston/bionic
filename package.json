@@ -12,7 +12,7 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/bionic.ts"
+      "./dist/extensions/bionic.js"
     ]
   },
   "scripts": {
@@ -25,7 +25,9 @@
     "lint:fix": "eslint . --fix --max-warnings=0",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "validate": "npm run format:check && npm run lint && npm run check && npm test"
+    "validate": "npm run format:check && npm run lint && npm run check && npm run build && npm test",
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "acorn": "8.15.0",
@@ -47,5 +49,23 @@
     "typebox": "1.0.43",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0"
-  }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/extensions/bionic.d.ts",
+      "import": "./dist/extensions/bionic.js"
+    },
+    "./providers": {
+      "types": "./dist/lib/providers/index.d.ts",
+      "import": "./dist/lib/providers/index.js"
+    }
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "docs/",
+    "examples/deployment/",
+    "examples/local-extension/",
+    "README.md"
+  ]
 }

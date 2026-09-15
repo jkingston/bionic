@@ -2,10 +2,11 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openApplication } from '../lib/application.ts';
-import { newWork } from '../lib/policy.ts';
+import { newWork, defaultGrant } from '../lib/policy.ts';
+import { FakeSreHost } from '../lib/adapters/fake-sre.ts';
 import type { Artifact, Contract } from '../lib/contracts.ts';
 const root = mkdtempSync(join(tmpdir(), 'bionic-demo-'));
-const app = openApplication(root);
+const app = openApplication(root, new FakeSreHost(), defaultGrant);
 const ctx = newWork(undefined, { task: 'Diagnose checkout latency' });
 const contract: Contract = {
   description: 'Check fake service health and latency',

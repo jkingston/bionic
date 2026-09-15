@@ -26,6 +26,7 @@ test('real Pi loader and agent loop use script tools and API context in fresh se
   const agentDir = join(dir, 'config');
   mkdirSync(agentDir);
   writeFileSync(join(dir, 'AGENTS.md'), 'SECRET_CONTEXT_SENTINEL');
+  writeFileSync(join(agentDir, 'APPEND_SYSTEM.md'), 'SECRET_CONTEXT_SENTINEL');
   const previous = process.env.BIONIC_CONTROLLED;
   process.env.BIONIC_CONTROLLED = '1';
   t.after(() => {

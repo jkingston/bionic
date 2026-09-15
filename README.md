@@ -4,6 +4,15 @@ A script-only Pi agent. Pi can discover, write, edit, and execute versioned
 JavaScript scripts. Scripts can call the same tools to compose one-off work.
 The Python/PydanticAI proof of concept has been removed.
 
+Use Bionic as a dependency without an npm release:
+
+```bash
+npm install 'git+https://github.com/jkingston/bionic.git#main'
+```
+
+Requires Node 24+ and enabled install scripts. Pin a commit or tag for deployments;
+see [Git installation and local development](docs/provider-extensions.md#install-from-git-or-develop-locally).
+
 ## Run
 
 With mise, use your existing Pi login and model configuration:
@@ -15,29 +24,28 @@ mise run models
 mise run pi --model 'provider/model-id'
 ```
 
-The `pi` task loads only Bionic and disables built-in tools, context files, skills,
-and prompt templates. It retains your normal Pi configuration directory (or your
-`PI_CODING_AGENT_DIR` override). Additional Pi arguments are passed through;
-use this task with trusted arguments. `mise run demo` runs without credentials,
-`mise run validate` runs all development checks, and `mise run format` formats files.
+Both `mise run pi` and `npm start` use the controlled Bionic launcher and retain
+your saved Pi credentials/models (`PI_CODING_AGENT_DIR` is honored). The default
+profile loads the fake SRE, clock, and deployment-catalog extensions. `/bionic`
+shows status; `/bionic runs` shows recent evidence. Shell `!`/`!!` commands are
+disabled. Each user prompt begins a shared work budget.
 
-Alternatively, run with npm and credentials from the environment:
+Requires **Node 24+** and npm. `npm ci` installs pinned dependencies and builds the
+runtime; no global Pi install is needed. For temporary Pi configuration with
+credentials from the environment, use `npm start -- --isolated --model YOUR_MODEL`.
 
-Requires **Node 24+**, npm, and a model provider API key. Pi 0.85.1 is pinned in
-the package; no separate global Pi install is required.
+To load deployment-specific APIs:
 
 ```bash
-npm ci
-export ANTHROPIC_API_KEY=...
-npm start -- --provider anthropic --model YOUR_MODEL
+mise run pi --deployment examples/deployment/deployment.json --model 'provider/model-id'
 ```
 
-`npm start` uses a dedicated temporary Pi configuration, disables built-in tools,
-context files, skills, prompt templates, and extension discovery, and loads only
-Bionic. Model credentials are read from the environment; the launcher does not
-reuse your global Pi login. `/bionic` shows status; `/bionic runs` shows recent
-evidence. Shell `!`/`!!` commands are disabled. Each user prompt begins a work
-budget; nested calls and agent repair attempts within that prompt share it.
+See [provider extension authoring](docs/provider-extensions.md) for external
+packages, grants, lifecycle rules, and the HTTP JSON example. Built-in tools,
+ambient extension discovery, context files, skills, and templates stay disabled.
+
+For a complete local example, follow
+[build a local extension and run it with Bionic](docs/provider-extensions.md#build-a-local-extension-and-run-it-with-bionic).
 
 This controls the agent's tools. The trusted Pi process itself is not sandboxed;
 only generated scripts run inside the WASM guest. Do not load arbitrary extensions
@@ -129,9 +137,10 @@ security boundary; the WASM guest and explicit imports provide containment.
 This remains dependent on the correctness of QuickJS, its WASM binding, and the
 bridge implementation, rather than a claim of formal security verification.
 
-The default grant permits all ten script tools over the local registry and only
-fake SRE services (`checkout`, `payments`, `auth`) plus `work.current` and
-`policy.describe`. There are **no real external service integrations**.
+The default demo grant permits all ten script tools over the local registry, fake
+SRE services (`checkout`, `payments`, `auth`), the clock and demo catalog, and core
+work/policy APIs. Custom deployments supply their own API and resource grants.
+The HTTP JSON foundation is tested locally; no production platform is configured.
 The broker checks declarations, grants, API schemas, and actual target services.
 Nested calls share cumulative calls, writes, source/output, time, and worker limits.
 Untested or failed-test scripts may run within those limits. Code review grants
@@ -164,3 +173,4 @@ event intake, durable workflows, and real-model evaluation remain future work.
 - [Script composition](docs/composition.md)
 - [Agent prompt](docs/agent-prompt.md)
 - [Implementation status and next steps](docs/future.md)
+- [Deployment APIs and provider extensions](docs/provider-extensions.md)

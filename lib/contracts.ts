@@ -84,8 +84,24 @@ export interface Capability {
 }
 export interface CapabilityProvider {
   definitions(): Capability[];
-  authorize(name: string, args: Json, grant: Grant): void;
-  invoke(name: string, args: Json): Promise<Json>;
+  authorize(
+    name: string,
+    args: Json,
+    grant: Grant,
+    context?: ProviderContext,
+  ): void | Promise<void>;
+  invoke(name: string, args: Json, context: ProviderContext): Promise<Json>;
+}
+/** Host-only context, created by the broker; never supplied by a script. */
+export interface ProviderContext {
+  signal: AbortSignal;
+  deadline: number;
+  principal: string;
+  workId: string;
+  runId: string;
+  callId: string;
+  resources: Record<string, Json>;
+  maxOutputBytes: number;
 }
 export interface Grant {
   principal: string;
@@ -94,6 +110,8 @@ export interface Grant {
   tools: ToolName[];
   capabilities: string[];
   services: string[];
+  /** Provider IDs map to provider-schema-validated resource scopes. */
+  resources?: Record<string, Json>;
   limits: {
     calls: number;
     writes: number;
