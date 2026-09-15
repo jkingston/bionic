@@ -47,6 +47,13 @@ export function validateGrant(grant: Grant): Grant {
       throw new BionicError('invalid_input', `Invalid grant ${key}`);
     }
   }
+  if (
+    grant.historyPrincipals !== undefined &&
+    (!Array.isArray(grant.historyPrincipals) ||
+      !grant.historyPrincipals.every((x) => typeof x === 'string' && x.length > 0))
+  ) {
+    throw new BionicError('invalid_input', 'Invalid history principals');
+  }
   grant.readPrefixes.forEach(prefix);
   grant.writePrefixes.forEach(prefix);
   if (grant.tools.some((t) => !TOOL_NAMES.includes(t))) {

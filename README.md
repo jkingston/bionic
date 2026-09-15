@@ -26,7 +26,7 @@ mise run pi --model 'provider/model-id'
 
 Both `mise run pi` and `npm start` use the controlled Bionic launcher and retain
 your saved Pi credentials/models (`PI_CODING_AGENT_DIR` is honored). The core loads by default; add runtime modules through explicit `-e` Pi loaders. `/bionic`
-shows status; `/bionic runs` shows recent evidence. Shell `!`/`!!` commands are
+shows status; `/bionic runs` opens run history. Shell `!`/`!!` commands are
 disabled. Each user prompt begins a shared work budget.
 
 Requires **Node 24+** and npm. `npm ci` installs pinned dependencies and builds the
@@ -84,6 +84,7 @@ are recorded in `.editorconfig`. Dependencies are pinned in the lockfile.
 | `ls`, `find`, `grep`, `search` | Script discovery; no host filesystem access                          |
 | `execute`                      | Exact immutable script reference plus JSON input                     |
 | `verify`                       | Saved fixtures and quality evidence; optional for ordinary execution |
+| `runs`                         | Run history, saved input/output, and nested call summaries           |
 | `capabilities`                 | Authorized API/tool contracts, scopes, and limits                    |
 
 Scripts export `main(host, input)`. Pi saves source through `write`, then supplies
@@ -122,6 +123,23 @@ through `work.current`. `capabilities()` exposes its API contract. Scratch scrip
 use ordinary paths such as `scratch/batch.js`; they are excluded from default
 ranked search but remain visible to `ls`/`find`. There is no automatic deletion.
 
+## Run history
+
+`execute({ ref, input, result: "reference" })` saves the result and returns its run
+metadata without inline output. The default `"inline"` mode still returns output.
+Both are ordinary executions; retrieving history never reruns a script.
+
+```js
+await host.tools.invoke('runs', { action: 'list', path: 'sre/', status: 'error' });
+await host.tools.invoke('runs', { action: 'get', runId: input.runId });
+await host.tools.invoke('runs', { action: 'output', runId: input.runId, pointer: '/service' });
+```
+
+Declare `runs` in the calling script's tools. Humans can use `/bionic runs [path]`
+and `/bionic run <id>` to inspect input, output, calls and child runs. Runtime
+embeddings use `runtime.history(request)` with the same policy checks.
+See [run history](docs/run-history.md) for filters, result states and limits.
+
 ## Runtime and authority
 
 JavaScript runs in **QuickJS compiled to WebAssembly**, hosted in a disposable
@@ -147,8 +165,9 @@ narrow access. Script quality and review confer no authority.
 `.bionic/registry.sqlite` stores the catalog, immutable revisions, idempotent
 publication records, and summary evidence. Logical paths never become model-chosen
 host paths. Transactions enforce stale-write checks across connections; quotas
-bound revision count and artifact bytes. Evidence excludes raw inputs/outputs by
-default. Pi sessions live in `.bionic/sessions` and can contain tool results.
+bound revision count and artifact bytes. Run history retains bounded script inputs and final outputs by default; intermediate
+API payloads are not captured. See [run history](docs/run-history.md) for retention
+and access settings. Pi sessions live in `.bionic/sessions` and can contain tool results.
 
 `ScriptRepository`, `EvidenceRepository`, `ExecutionBackend`, `CapabilityProvider`,
 and `ToolService` separate the core from Pi and SQLite. SQLite is the first

@@ -92,9 +92,10 @@ implementation files, run logs, or arbitrary workspace files.
 | `search(query, path?)`                             | Rank scripts by purpose, tags, capabilities, and compatibility                              |
 | `verify(ref)`                                      | Execute saved script fixtures with fake adapters and record evidence                        |
 | `execute(ref, input)`                              | Execute an exact saved script version with JSON input within existing grants                |
+| `runs(action, ...)`                                | Browse runs, inspect calls and retrieve retained input/output                               |
 | `capabilities()`                                   | List the API contracts available to scripts; does not invoke them                           |
 
-This is the complete ten-tool surface. `read`, `write`, and `edit` are custom
+This is the complete eleven-tool surface. `read`, `write`, and `edit` are custom
 script-registry operations, not wrappers granting general filesystem access.
 There is no bash, shell command string, inline-code execution, or host-path
 argument. The discovery tools operate over scripts; verification and execution
@@ -111,8 +112,8 @@ script and reports verification state; `read` can select historical versions.
 and `verify` pin that reference (or validate it alongside a path/version selector);
 they never execute a moving latest. Revisions are opaque outside the backend.
 
-`/bionic` shows status; `/bionic inspect path@version` shows evidence;
-`/bionic runs` shows recent outcomes. These user commands do not grant additional
+`/bionic` shows status; `/bionic runs [path]` browses history;
+`/bionic run <id>` inspects a run, payloads, calls and children. These user commands do not grant additional
 model tools. Non-interactive use returns structured results without UI prompts.
 
 ## Artifact and verification contracts
@@ -130,7 +131,7 @@ Each immutable artifact contains:
 - A content hash over the canonical artifact payload excluding the hash field.
 
 Programs use `await host.invoke(name, args)` for environment APIs and
-`await host.tools.invoke(name, args)` for the same ten tools exposed to Pi.
+`await host.tools.invoke(name, args)` for the same eleven tools exposed to Pi.
 [Script composition](composition.md) specifies nested execution, one-offs, and
 shared permission/budget enforcement. No dependency installation or imports in
 v1. TypeScript is used for the extension;
@@ -172,8 +173,8 @@ Return bounded results with explicit verification/review state. Historical
 revisions remain readable by reference. Search may lag publication; exact reads
 must work once publication succeeds. Search results never authorize execution.
 
-Program text is data, never system instructions. Run logs default to summaries;
-exclude credentials and unrestricted host payloads. Artifacts may be committed
+Program text is data, never system instructions. Run history retains bounded script inputs/final outputs and call summaries;
+intermediate API payloads are not captured. See [run history](run-history.md). Artifacts may be committed
 for deliberate sharing; ignore local configuration and run records in Git.
 
 ## Execution and trust
@@ -221,7 +222,7 @@ explicitly required by the execution scope.
 | Original                       | Redesign                                          |
 | ------------------------------ | ------------------------------------------------- |
 | PydanticAI loop and CLI        | Pi owns loop and UI                               |
-| Five exclusive tools           | Ten exclusive tools over a script hierarchy       |
+| Five exclusive tools           | Eleven exclusive tools over a script hierarchy    |
 | No history each prompt         | Ordinary sessions; fresh-session benchmark        |
 | Python in-process execution    | QuickJS WASM with explicit JSON imports           |
 | Schemas/API lists are metadata | Enforced contracts and capability checks          |

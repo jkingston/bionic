@@ -2,7 +2,7 @@
 
 ## Implemented
 
-- Pi 0.85.1 extension and controlled launcher, with exactly ten script tools.
+- Pi 0.85.1 extension and controlled launcher, with exactly eleven script tools.
 - Static operating prompt; context-file/skill/template discovery disabled.
 - SQLite repository and evidence adapter behind domain interfaces, immutable
   references, optimistic revisions, idempotent publication, and logical hierarchy.
@@ -18,13 +18,14 @@
 - Tests using SQLite in memory and on disk, adversarial WASM guest code, nested
   tool calls, and the actual Pi loader/agent loop with a scripted provider.
 
-The Python/PydanticAI prototype, dependencies, environment, and guide were removed.
+- Persistent run history with bounded inputs/results, nested call summaries,
+  scriptable retrieval, reference execution results, and Pi browsing.
 
 ## Deliberately not implemented
 
 Git-backed publication and human review, HTTP event intake, durable workflows,
 platform-specific SDK adapters, live grant revocation/approval UI, alternative storage
-backends, retention/garbage collection, and real-model benchmark results.
+backends, script/evidence garbage collection, and real-model benchmark results.
 The design documents specify extension points; they are not claims those
 integrations exist. Runtime policy is fixed at runtime creation; work budgets reset per user prompt.
 

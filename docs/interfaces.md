@@ -73,6 +73,8 @@ interface ScriptRepository {
   publish(request: PublishRevision): Promise<Publication>;
 }
 
+// RunRepository separately owns lifecycle, queryable runs, calls and payloads.
+// See lib/runs.ts and run-history.md for the implemented interface.
 interface EvidenceRepository {
   append(record: EvidenceRecord): Promise<void>;
   query(query: EvidenceQuery): Promise<Page<EvidenceRecord>>;

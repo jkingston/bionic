@@ -89,8 +89,8 @@ test('script chains search, read and child execution without an LLM', async (t) 
     run.output.map((r: any) => r.output.name),
     ['checkout', 'payments'],
   );
-  const records = await s.store.recent(30);
-  assert.equal(records.filter((r) => r.kind === 'run').length, 3);
+  const records = (await s.call('runs', { action: 'list', includeChildren: true })) as any;
+  assert.equal(records.items.length, 3);
 });
 test('script can write, edit, verify and run a child using returned refs', async (t) => {
   const s = setup();

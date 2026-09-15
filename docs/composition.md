@@ -16,8 +16,8 @@ script → worker IPC → tool broker ┘                  ├─ registry
                                                     └─ execution
 ```
 
-Expose all ten tool contracts through `host.tools.invoke(name, args)`: read,
-write, edit, ls, find, grep, search, verify, execute, and capabilities. The script
+Expose all eleven tool contracts through `host.tools.invoke(name, args)`: read,
+write, edit, ls, find, grep, search, verify, execute, capabilities, and runs. The script
 uses `host.invoke(name, args)` for environment APIs. Both surfaces share trusted
 invocation identity and resource accounting but have distinct names and schemas.
 The capabilities result includes permitted tool contracts as well as environment
@@ -115,3 +115,10 @@ self-edit snapshot behavior, scope-denied registry mutations, and equivalent
 permission decisions for both callers. Test nested cancellation, shared retry
 budgets, recursion/fan-out bounds, concurrent edits, and scheduler saturation.
 No test or review requirement is added solely because a caller is a script.
+
+## Saved results
+
+Scripts can declare `runs` to retrieve retained inputs and outputs from earlier runs,
+including across sessions. `execute` supports reference results for later processing.
+History access inherits principal and path restrictions, consumes cumulative budgets,
+and is unavailable during fixture verification. See [run history](run-history.md).

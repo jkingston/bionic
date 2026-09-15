@@ -1,3 +1,4 @@
+import { TOOL_NAMES } from './contracts.ts';
 import { Type } from 'typebox';
 const object = (properties: any) => Type.Object(properties, { additionalProperties: false });
 const text = () => Type.String({ maxLength: 131072 });
@@ -22,23 +23,9 @@ export const contractSchema = object({
     object({ name: Type.String({ maxLength: 100 }), version: Type.Integer({ minimum: 1 }) }),
     { maxItems: 32 },
   ),
-  tools: Type.Array(
-    Type.Union(
-      [
-        'read',
-        'write',
-        'edit',
-        'ls',
-        'find',
-        'grep',
-        'search',
-        'verify',
-        'execute',
-        'capabilities',
-      ].map((x) => Type.Literal(x)),
-    ),
-    { maxItems: 10 },
-  ),
+  tools: Type.Array(Type.Union(TOOL_NAMES.map((x) => Type.Literal(x))), {
+    maxItems: TOOL_NAMES.length,
+  }),
   fixtures: Type.Array(
     object({
       input: Type.Unknown(),
@@ -74,7 +61,42 @@ export const schemas = {
   find: object({ ...paging, pattern: Type.String({ maxLength: 240 }) }),
   grep: object({ ...paging, pattern: Type.String({ minLength: 1, maxLength: 500 }) }),
   search: object({ ...paging, query: Type.String({ minLength: 1, maxLength: 500 }) }),
-  execute: object({ ref, input: Type.Unknown() }),
+  execute: object({
+    ref,
+    input: Type.Unknown(),
+    result: Type.Optional(Type.Union([Type.Literal('inline'), Type.Literal('reference')])),
+  }),
+  runs: Type.Union([
+    object({
+      action: Type.Literal('list'),
+      ...paging,
+      ref: Type.Optional(ref),
+      workId: Type.Optional(Type.String({ maxLength: 100 })),
+      parentRunId: Type.Optional(Type.String({ maxLength: 100 })),
+      includeChildren: Type.Optional(Type.Boolean()),
+      kind: Type.Optional(Type.Union(['execution', 'fixture', 'all'].map((x) => Type.Literal(x)))),
+      status: Type.Optional(
+        Type.Union(
+          ['running', 'success', 'error', 'cancelled', 'timeout', 'unknown'].map((x) =>
+            Type.Literal(x),
+          ),
+        ),
+      ),
+      since: Type.Optional(Type.String({ maxLength: 30 })),
+      until: Type.Optional(Type.String({ maxLength: 30 })),
+    }),
+    object({
+      action: Type.Literal('get'),
+      runId: Type.String({ maxLength: 100 }),
+      limit: paging.limit,
+      cursor: paging.cursor,
+    }),
+    object({
+      action: Type.Union([Type.Literal('input'), Type.Literal('output')]),
+      runId: Type.String({ maxLength: 100 }),
+      pointer: Type.Optional(Type.String({ maxLength: 1000 })),
+    }),
+  ]),
   verify: object({ ref }),
   capabilities: object({}),
 };
@@ -88,8 +110,9 @@ export const descriptions: Record<keyof typeof schemas, string> = {
   grep: 'Search literal case-sensitive text in current script source. Returns bounded line matches.',
   search:
     'Search scripts by purpose using path and description. Scratch scripts are omitted unless path is supplied.',
+  runs: 'List runs, inspect metadata and paginated calls, or retrieve saved input/output (optional JSON Pointer). Own principal and readable script scope by default. History is past observation, not current state. Retrieval is bounded; never re-executes.',
   execute:
-    'Execute a saved immutable script ref with JSON input in WASM. No inline code or shell. Untested drafts may run within grants.',
+    'Execute a saved immutable script ref with JSON input in WASM. Use result=reference to omit inline output and retrieve it later with runs. No inline code or shell. Untested drafts may run within policy.',
   verify:
     'Run saved script fixtures with fake responses. Quality evidence never grants permissions or gates ordinary execution.',
   capabilities:

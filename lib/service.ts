@@ -1,3 +1,5 @@
+import type { RunRepository } from './runs.ts';
+import { queryHistory } from './history.ts';
 import { randomUUID } from 'node:crypto';
 import {
   BionicError,
@@ -35,6 +37,7 @@ export class BionicService implements ToolService {
     readonly evidence: EvidenceRepository,
     readonly executor: ExecutionBackend,
     readonly provider: CapabilityProvider,
+    readonly runs: RunRepository,
   ) {}
   private scope(path: string, ctx: Invocation, write = false) {
     if (!inScope(path, write ? ctx.grant.writePrefixes : ctx.grant.readPrefixes)) {
@@ -148,8 +151,30 @@ export class BionicService implements ToolService {
       case 'search':
         result = await this.discover(tool, args, ctx);
         break;
-      case 'execute':
-        result = await this.run(args.ref, args.input, ctx, signal);
+      case 'execute': {
+        const run = await this.run(args.ref, args.input, ctx, signal);
+        if (args.result === 'reference') {
+          const { output, ...record } = run;
+          if (output !== undefined) {
+            charge(ctx, 'outputBytes', Buffer.byteLength(JSON.stringify(output)));
+          }
+          result = record;
+        } else {
+          result = run;
+        }
+        break;
+      }
+      case 'runs':
+        if (ctx.fixture) {
+          throw new BionicError('forbidden', 'Verification cannot read live run history');
+        }
+        result = await queryHistory(this.runs, args, ctx);
+        if (Buffer.byteLength(JSON.stringify(result)) > 65536) {
+          throw new BionicError(
+            'limit',
+            'History response exceeds 64 KiB; use a smaller page or a JSON Pointer',
+          );
+        }
         break;
       case 'verify': {
         const artifact = await this.repository.readRef(args.ref);
@@ -425,6 +450,29 @@ export class BionicService implements ToolService {
     }
     const runId = randomUUID(),
       start = Date.now();
+    ctx.budget.active++;
+    try {
+      await this.runs.start(
+        {
+          runId,
+          workId: ctx.workId,
+          parentRunId: ctx.parentRunId ?? null,
+          principal: ctx.grant.principal,
+          ref: artifact.ref,
+          path: artifact.path,
+          kind: ctx.fixture ? 'fixture' : 'execution',
+          status: 'running',
+          startedAt: new Date(start).toISOString(),
+          deadline: Math.min(ctx.budget.deadline, start + ctx.grant.limits.runMs),
+          callCount: 0,
+          childCount: 0,
+        },
+        input,
+      );
+    } catch (e) {
+      ctx.budget.active--;
+      throw e;
+    }
     const local = new AbortController();
     const abort = () => local.abort();
     signal?.addEventListener('abort', abort, { once: true });
@@ -438,9 +486,9 @@ export class BionicService implements ToolService {
       tools: new Set(artifact.contract.tools),
       capabilities: new Set(artifact.contract.capabilities.map((c) => c.name)),
     };
-    ctx.budget.active++;
     const pending = new Set<Promise<Json>>();
     let result: any;
+    let callCount = 0;
     try {
       const output = await this.executor.execute(
         {
@@ -456,29 +504,31 @@ export class BionicService implements ToolService {
           ),
         },
         (kind, name, args, callId) => {
+          if (++callCount > 1000) {
+            return Promise.reject(new BionicError('limit', 'Run trace exceeds 1000 calls'));
+          }
+          const callStart = Date.now();
           const operation = (async () => {
+            let outcome: 'success' | 'error' = 'success';
+            let error;
             try {
-              const value =
-                kind === 'tool'
-                  ? await this.invoke(name, args, child, `${runId}:${callId}`, local.signal)
-                  : await this.api(name, args, child, `${runId}:${callId}`, local.signal);
-              await this.evidence.append({
-                id: `${runId}:${callId}`,
-                kind: 'tool',
-                at: new Date().toISOString(),
-                workId: ctx.workId,
-                data: json({ runId, kind, name, outcome: 'success' }),
-              });
-              return value;
+              return kind === 'tool'
+                ? await this.invoke(name, args, child, `${runId}:${callId}`, local.signal)
+                : await this.api(name, args, child, `${runId}:${callId}`, local.signal);
             } catch (e) {
-              await this.evidence.append({
-                id: `${runId}:${callId}`,
-                kind: 'tool',
-                at: new Date().toISOString(),
-                workId: ctx.workId,
-                data: json({ runId, kind, name, outcome: 'error', error: failure(e) }),
-              });
+              outcome = 'error';
+              error = failure(e);
               throw e;
+            } finally {
+              await this.runs.appendCall(runId, {
+                callId: `${runId}:${callId}`,
+                kind,
+                name,
+                outcome,
+                startedAt: new Date(callStart).toISOString(),
+                durationMs: Date.now() - callStart,
+                ...(error ? { error: { ...error, message: error.message.slice(0, 2000) } } : {}),
+              });
             }
           })();
           pending.add(operation);
@@ -501,21 +551,10 @@ export class BionicService implements ToolService {
       ctx.budget.active--;
       signal?.removeEventListener('abort', abort);
     }
-    const summary = {
-      runId,
-      parentRunId: ctx.parentRunId ?? null,
-      ref,
-      status: result.status,
-      durationMs: Date.now() - start,
-      ...(result.error ? { error: result.error } : {}),
-    };
-    await this.evidence.append({
-      id: runId,
-      kind: 'run',
-      at: new Date().toISOString(),
-      workId: ctx.workId,
-      data: json(summary),
-    });
+    if (result.error) {
+      result.error.message = result.error.message.slice(0, 2000);
+    }
+    const summary = await this.runs.finish(runId, result);
     return { ...summary, ...result };
   }
 }

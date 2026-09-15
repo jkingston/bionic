@@ -144,7 +144,7 @@ Distinguish an immutable WorkflowDefinition from each WorkflowRun. A definition
 pins script references, input mappings, allowed capabilities, time/budget limits,
 retry/idempotency rules, and trigger configuration. Store and review definitions
 behind a WorkflowRepository when this feature is implemented; do not add a DAG
-engine or workflow-authoring tools to the initial ten-tool surface.
+engine or workflow-authoring tools to the initial eleven-tool surface.
 
 Definition lifecycle: draft → structurally validated → enabled within a trigger
 grant → retired or revoked. Code review is optional unless publication or the

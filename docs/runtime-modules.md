@@ -30,7 +30,7 @@ mise run pi -e ./extensions/fake-sre.ts -e ./extensions/clock.ts \
 
 With no `-e`, only Bionic's core work/policy APIs are available. Ambient extension,
 context-file, skill and template discovery remains disabled, and Pi's built-in
-tools remain replaced by the ten script tools. Saved Pi credentials/models are
+tools remain replaced by the eleven script tools. Saved Pi credentials/models are
 retained; `--isolated` uses temporary Pi configuration and environment credentials.
 
 ## Install from Git or develop locally
@@ -209,7 +209,7 @@ const runtime = await createRuntime({
 });
 ```
 
-All fields are optional. Defaults permit the ten script tools, all logical script
+All fields are optional. Defaults permit the eleven script tools, all logical script
 paths and loaded capabilities, within bounded execution limits. Policy can restrict
 tools, API names and script prefixes; it cannot bypass a module's own restrictions.
 Authorization hooks are awaited before invocation. For programmatic Pi embeddings,

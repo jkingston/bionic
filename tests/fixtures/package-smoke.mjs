@@ -81,7 +81,7 @@ const { session } = await createAgentSession({
 const errors = [];
 try {
   await session.bindExtensions({ onError: (e) => errors.push(e) });
-  assert.equal(session.getActiveToolNames().length, 10);
+  assert.equal(session.getActiveToolNames().length, 11);
   let ref;
   const tool = (name, args) =>
     ai.fauxAssistantMessage(ai.fauxToolCall(name, args), { stopReason: 'toolUse' });

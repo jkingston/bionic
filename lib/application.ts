@@ -1,3 +1,4 @@
+import type { HistoryOptions } from './runs.ts';
 import { join } from 'node:path';
 import { SqliteStore } from './adapters/sqlite.ts';
 import { WasmExecutor } from './adapters/wasm.ts';
@@ -11,9 +12,13 @@ export const contextContract: Contract = {
   tools: [],
   fixtures: [],
 };
-export function openApplication(root: string, provider: CapabilityProvider) {
-  const store = new SqliteStore(join(root, 'registry.sqlite'));
-  const service = new BionicService(store, store, new WasmExecutor(), provider);
+export function openApplication(
+  root: string,
+  provider: CapabilityProvider,
+  history?: HistoryOptions,
+) {
+  const store = new SqliteStore(join(root, 'registry.sqlite'), history);
+  const service = new BionicService(store, store, new WasmExecutor(), provider, store.runs);
   return {
     store,
     service,

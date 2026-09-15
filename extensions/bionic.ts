@@ -1,3 +1,5 @@
+import { browseRuns, inspectRun, runSummary, historySummary, safeText } from '../lib/pi/history.ts';
+import type { HistoryOptions, RunRecord } from '../lib/runs.ts';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { resolve } from 'node:path';
 import { TOOL_NAMES, failure, type ToolName } from '../lib/contracts.ts';
@@ -6,7 +8,7 @@ import { OPERATING_PROMPT } from '../lib/prompt.ts';
 import { createRuntime, type RuntimeWork, type RuntimePolicy } from '../lib/runtime/index.ts';
 import { moduleDiscovery } from '../lib/pi/modules.ts';
 
-export function createBionicExtension(policy: RuntimePolicy = {}) {
+export function createBionicExtension(policy: RuntimePolicy = {}, history?: HistoryOptions) {
   return function bionic(pi: ExtensionAPI) {
     const discoverModules = moduleDiscovery(pi);
     let runtime: Awaited<ReturnType<typeof createRuntime>> | undefined;
@@ -22,7 +24,7 @@ export function createBionicExtension(policy: RuntimePolicy = {}) {
       const active = pi.getActiveTools().sort();
       if (active.join(',') !== [...TOOL_NAMES].sort().join(',')) {
         throw new Error(
-          'Bionic requires exactly its ten script tools; restart using the bionic launcher.',
+          'Bionic requires exactly its eleven script tools; restart using the bionic launcher.',
         );
       }
     };
@@ -37,6 +39,7 @@ export function createBionicExtension(policy: RuntimePolicy = {}) {
         root: resolve(ctx.cwd, '.bionic'),
         modules: discoverModules(),
         policy,
+        history,
       });
       pi.setActiveTools([...TOOL_NAMES]);
       checkTools();
@@ -83,6 +86,19 @@ export function createBionicExtension(policy: RuntimePolicy = {}) {
           return block(`${name} ${JSON.stringify(args)}`);
         },
         renderResult(result, options) {
+          if (name === 'execute' && (result.details as any)?.runId) {
+            const record = result.details as unknown as RunRecord;
+            return block(
+              runSummary(record) +
+                (options.expanded
+                  ? '\n' + JSON.stringify(result.details, null, 2)
+                  : '\nUse /bionic run ' + record.runId + ' to inspect.'),
+              options.expanded ? 80 : 8,
+            );
+          }
+          if (name === 'runs' && !options.expanded) {
+            return block(historySummary(result.details), 12);
+          }
           return block(
             JSON.stringify(result.details, null, options.expanded ? 2 : undefined),
             options.expanded ? 80 : 8,
@@ -111,16 +127,31 @@ export function createBionicExtension(policy: RuntimePolicy = {}) {
       });
     }
     pi.registerCommand('bionic', {
-      description: 'Show Bionic registry, work budget, or recent run summaries (/bionic runs).',
+      description:
+        'Status, /bionic runs [script or folder], or /bionic run <id> to inspect input, output, calls and children.',
       handler: async (args, ctx) => {
         if (!runtime) {
           ctx.ui.notify('Bionic is not initialized', 'error');
           return;
         }
-        const text =
-          args.trim() === 'runs'
-            ? JSON.stringify(await runtime.recent(10), null, 2)
-            : JSON.stringify(
+        const [command, value] = args.trim().split(/\s+/);
+        try {
+          if (command === 'runs') {
+            await browseRuns(
+              ctx,
+              (request) => runtime!.history(request),
+              value ? { path: value } : {},
+            );
+          } else if (command === 'run' && value) {
+            await inspectRun(ctx, (request) => runtime!.history(request), value);
+          } else if (command) {
+            ctx.ui.notify(
+              'Use /bionic, /bionic runs [script or folder], or /bionic run <id>.',
+              'info',
+            );
+          } else {
+            ctx.ui.notify(
+              JSON.stringify(
                 {
                   registryId: runtime.registryId,
                   root: resolve(ctx.cwd, '.bionic'),
@@ -129,8 +160,13 @@ export function createBionicExtension(policy: RuntimePolicy = {}) {
                 },
                 null,
                 2,
-              );
-        ctx.ui.notify(text, 'info');
+              ),
+              'info',
+            );
+          }
+        } catch (e) {
+          ctx.ui.notify(safeText(String(e)), 'error');
+        }
       },
     });
   };

@@ -9,3 +9,15 @@ export {
 export { createHttpJsonModule, type HttpJsonOptions, type HttpJsonOperation } from './http-json.ts';
 export { BionicError } from '../contracts.ts';
 export type { Capability, Json, Schema, ScriptRef, Artifact, Contract } from '../contracts.ts';
+
+export type {
+  RunRecord,
+  RunStatus,
+  RunRepository,
+  RunQuery,
+  RunAccess,
+  RunCall,
+  PayloadInfo,
+  HistoryOptions,
+  RunsRequest,
+} from '../runs.ts';

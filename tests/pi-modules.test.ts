@@ -197,6 +197,31 @@ test('production extensions: discovery, WASM composition, reload, fresh sessions
             assert.equal(run.status, 'success');
             assert.equal(run.output.service.name, 'checkout');
             assert.ok(Number.isFinite(Date.parse(run.output.time.utc)));
+            return ai.fauxAssistantMessage(
+              ai.fauxToolCall('runs', { action: 'get', runId: run.runId }),
+              { stopReason: 'toolUse' },
+            );
+          },
+          (context: any) => {
+            const run = JSON.parse(
+              context.messages.filter((m: any) => m.role === 'toolResult').at(-1).content[0].text,
+            );
+            assert.equal(run.status, 'success');
+            assert.equal(run.calls.items.length, 2);
+            return ai.fauxAssistantMessage(
+              ai.fauxToolCall('runs', {
+                action: 'output',
+                runId: run.runId,
+                pointer: '/service/name',
+              }),
+              { stopReason: 'toolUse' },
+            );
+          },
+          (context: any) => {
+            const saved = JSON.parse(
+              context.messages.filter((m: any) => m.role === 'toolResult').at(-1).content[0].text,
+            );
+            assert.equal(saved.output, 'checkout');
             return ai.fauxAssistantMessage('Complete');
           },
         ];

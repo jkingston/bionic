@@ -47,7 +47,7 @@ Inspect the default prompt of the pinned Pi release during implementation.
 The controlled profile must not retain conflicting assumptions about arbitrary
 filesystem access, shell commands, or mandatory coding workflows. Supply this
 operating prompt through the supported system-prompt configuration and keep
-Pi's generated tool schemas consistent with the ten registered script tools.
+Pi's generated tool schemas consistent with the eleven registered script tools.
 Do not rely on a corrective paragraph appended beneath contradictory defaults.
 
 Disable automatic context-file, skill, and prompt-template discovery in this
@@ -108,6 +108,9 @@ schema versions in evaluations so comparisons are reproducible.
 ## Current permission integration
 
 The installed operating prompt reports concrete missing grants. A human edits
-trusted grant configuration, which is loaded at the next user prompt. Automatic
+trusted runtime/module policy, applied when recreating the runtime. Automatic
 UI approval and durable waiting work items are future integrations. This does not
 add a test/review gate or allow the model to grant itself access.
+
+Run history is retrieved through `runs`; no prior results are injected into the
+prompt. Treat saved results as timestamped observations, not current state.

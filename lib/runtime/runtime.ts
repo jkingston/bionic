@@ -1,3 +1,4 @@
+import type { HistoryOptions, RunsRequest } from '../runs.ts';
 import { randomUUID } from 'node:crypto';
 import { BionicError, type Json } from '../contracts.ts';
 import { coreGrant, newWork, validateGrant } from '../policy.ts';
@@ -9,6 +10,7 @@ export interface RuntimeOptions {
   root: string;
   modules?: RuntimeModule[];
   policy?: RuntimePolicy;
+  history?: HistoryOptions;
 }
 export interface RuntimeWork {
   readonly id: string;
@@ -51,22 +53,30 @@ export async function createRuntime(options: RuntimeOptions) {
     const grant = validateGrant({
       ...base,
       principal: policy.principal ?? 'local',
+      historyPrincipals: policy.historyPrincipals,
       capabilities: policy.capabilities ?? available,
       tools: policy.tools ?? base.tools,
       readPrefixes: policy.readPrefixes ?? base.readPrefixes,
       writePrefixes: policy.writePrefixes ?? base.writePrefixes,
       limits: { ...base.limits, ...policy.limits },
     });
-    app = openApplication(options.root, registry);
+    app = openApplication(options.root, registry, options.history);
     await app.seed();
     const application = app;
     const inflight = new Set<Promise<Json>>();
     const controllers = new Set<AbortController>();
     let closing: Promise<void> | undefined;
-    return {
+    const runtime = {
       registryId: application.store.registryId,
       capabilities: () => registry.definitions(),
-      recent: (limit = 10) => application.store.recent(limit),
+      async history(request: RunsRequest): Promise<Json> {
+        const work = runtime.beginWork(null);
+        try {
+          return await work.invoke('runs', request);
+        } finally {
+          work.cancel();
+        }
+      },
       beginWork(input: Json): RuntimeWork {
         if (closing) {
           throw new BionicError('cancelled', 'Runtime is closed');
@@ -119,6 +129,7 @@ export async function createRuntime(options: RuntimeOptions) {
         return closing;
       },
     };
+    return runtime;
   } catch (error) {
     try {
       await registry.dispose();

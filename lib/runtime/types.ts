@@ -12,6 +12,8 @@ export type CallContext = ProviderContext;
 /** Optional restrictions over the authority of explicitly loaded modules. */
 export interface RuntimePolicy {
   principal?: string;
+  /** Additional principals whose retained runs this embedding may read. */
+  historyPrincipals?: string[];
   capabilities?: string[];
   tools?: ToolName[];
   readPrefixes?: string[];

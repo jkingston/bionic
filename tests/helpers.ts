@@ -15,7 +15,7 @@ export const basic: Contract = {
 export function setup(grant: Grant = defaultGrant(), file = ':memory:') {
   const store = new SqliteStore(file),
     provider = new FakeSreHost();
-  const service = new BionicService(store, store, new WasmExecutor(), provider);
+  const service = new BionicService(store, store, new WasmExecutor(), provider, store.runs);
   const ctx = newWork(grant);
   let n = 0;
   const call = (name: string, args: unknown, signal?: AbortSignal) =>

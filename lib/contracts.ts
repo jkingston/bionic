@@ -11,6 +11,7 @@ export const TOOL_NAMES = [
   'verify',
   'execute',
   'capabilities',
+  'runs',
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 export interface ScriptRef {
@@ -109,6 +110,7 @@ export interface Grant {
   tools: ToolName[];
   capabilities: string[];
   services: string[];
+  historyPrincipals?: string[];
   limits: {
     calls: number;
     writes: number;

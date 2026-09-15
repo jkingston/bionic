@@ -1,3 +1,5 @@
+import { SqliteRuns } from './sqlite-runs.ts';
+import type { HistoryOptions } from '../runs.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { lstatSync, mkdirSync, realpathSync } from 'node:fs';
@@ -17,7 +19,8 @@ import { canonical, hash, scriptPath } from '../validation.ts';
 export class SqliteStore implements ScriptRepository, EvidenceRepository {
   private db: DatabaseSync;
   readonly registryId: string;
-  constructor(file: string) {
+  readonly runs: SqliteRuns;
+  constructor(file: string, history: HistoryOptions = {}) {
     if (file !== ':memory:') {
       const absolute = resolve(file);
       let part = parse(absolute).root;
@@ -55,6 +58,12 @@ export class SqliteStore implements ScriptRepository, EvidenceRepository {
       CREATE TABLE IF NOT EXISTS publications(request_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,artifact TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS evidence(id TEXT PRIMARY KEY,record TEXT NOT NULL);
       INSERT OR IGNORE INTO metadata VALUES('registryId','${randomUUID()}');`);
+    try {
+      this.runs = new SqliteRuns(this.db, history);
+    } catch (e) {
+      this.db.close();
+      throw e;
+    }
     this.registryId = (
       this.db.prepare("SELECT value FROM metadata WHERE key='registryId'").get() as any
     ).value;
