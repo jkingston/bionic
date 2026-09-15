@@ -1,0 +1,51 @@
+{
+  "name": "bionic-pi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Script-only Pi agent with durable artifacts and bounded tool composition",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "bionic": "bin/bionic.mjs"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/bionic.ts"
+    ]
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test --test-isolation=none tests/*.test.ts",
+    "test:wasm": "node --import tsx --test --test-isolation=none tests/wasm.test.ts",
+    "start": "node bin/bionic.mjs",
+    "demo": "node --import tsx examples/demo.ts",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "validate": "npm run format:check && npm run lint && npm run check && npm test"
+  },
+  "dependencies": {
+    "acorn": "8.15.0",
+    "ajv": "8.17.1",
+    "quickjs-emscripten": "0.32.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "typebox": "1.0.43"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.19.0",
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "tsx": "4.20.6",
+    "typebox": "1.0.43",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0"
+  }
+}
